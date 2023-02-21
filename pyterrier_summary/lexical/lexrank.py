@@ -1,7 +1,5 @@
 import pyterrier as pt
-import pyterrier as pt
 import logging
-import re
 from collections import Counter, defaultdict
 import math
 from typing import List, NamedTuple, Tuple, Union
@@ -66,20 +64,18 @@ class LexRanker(Summarizer):
 
         self.tokeniser = pt.rewrite.tokenise(tokeniser=tokeniser)
 
-        if stopwords:
-            self.stopwords = pt.autoclass("org.terrier.terms.Stopwords")(None).isStopword
-        else: 
-            self.stopwords = lambda x : False
+        if stopwords: self.stopwords = pt.autoclass("org.terrier.terms.Stopwords")(None).isStopword
+        else: self.stopwords = lambda x : False
 
         if stemmer is not None:
             stem_name = f"org.terrier.terms.{stemmer}" if '.' not in stemmer else stemmer
             self.stemmer = pt.autoclass(stem_name)().stem
         else:
             self.stemmer = lambda x : x
+
         if documents: self.init_index(documents)
 
         if setting != 'scores' and output_list: setting = 'sentences'
-
         outputs = {
             'summary' : self.summary,
             'sentences' : self.list_summary,
