@@ -44,7 +44,7 @@ class NeuralSummarizer(Summarizer):
                 inps = self.tokenizer(chunk, padding="max_length", truncation=True, max_length=self.enc_max_length, return_tensors="pt")
                 inps = inps.input_ids.to(self.device)
                 attention_mask = inps.attention_mask.to(self.device)
-                out = self.model.generate(inps, attention_mask=attention_mask)
+                out = self.model.generate(inps, attention_mask=attention_mask).cpu()
                 results.extend(self.tokenizer.batch_decode(out, skip_special_tokens=True))
         return results
     
