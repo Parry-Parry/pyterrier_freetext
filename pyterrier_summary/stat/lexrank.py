@@ -255,7 +255,7 @@ class LexRanker(Summarizer):
              logging.warning('Index not initialized, creating from inputs and a reference if it exists')   
              self.init_index(inp)
 
-        documents[self.setting] = documents.apply(lambda x : self._lexrank(x), axis=1)
+        documents[self.out_attr] = documents.apply(lambda x : self._lexrank(x), axis=1)
         return documents
 
         
