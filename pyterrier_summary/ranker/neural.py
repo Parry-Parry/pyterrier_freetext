@@ -5,6 +5,8 @@ import torch
 from more_itertools import chunked
 import logging 
 from pyterrier_t5 import MonoT5Ranker
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from . import split_into_sentences
 from .. import NeuralSummarizer
@@ -34,7 +36,7 @@ class T5Ranker(NeuralSummarizer):
             'scores' : self.scorer
         }
         self.output = outputs[setting]
-        self.model = MonoT5Ranker()
+        self.model = MonoT5Ranker(batch_size=batch_size, text_field=self.body_attr, verbose=self.verbose)
     
     def _get_body(self,document):
         body = getattr(document, self.body_attr)
@@ -68,6 +70,75 @@ class T5Ranker(NeuralSummarizer):
 
         inp = self._construct_frame(getattr(text, self.query_attr), sentences)
         scores = self.model(inp)['score'].tolist()
+
+        return self.output(sentences, scores)
+    
+    def transform(self, inp):
+        assert self.query_attr in inp.columns and self.body_attr in inp.columns
+        inp[self.out_attr] = inp.apply(lambda x : self._summarize(x), axis=1)
+        return inp 
+    
+class SentenceRanker(NeuralSummarizer):
+    metrics = {
+        'cosine' : cosine_similarity
+    }
+    def __init__(self, 
+                 model_name,
+                 tokenizer_name=None,
+                 setting='summary',
+                 metric='cosine',    
+                 num_sentences=0,
+                 reverse=False,
+                 output_list=False,
+                 batch_size=None, 
+                 device=None, 
+                 enc_max_length=180, 
+                 body_attr='text', 
+                 query_attr='query',
+                 out_attr='summary', 
+                 verbose=False) -> None:
+        super().__init__(model_name, tokenizer_name, batch_size, device, enc_max_length, body_attr, out_attr, verbose)
+        
+        self.num_sentences = num_sentences
+        self.query_attr = query_attr
+        self.reverse = 1 if reverse else -1
+        if setting != 'scores' and output_list: setting = 'sentences'
+        outputs = {
+            'summary' : self.summary,
+            'sentences' : self.list_summary,
+            'scores' : self.scorer
+        }
+        self.output = outputs[setting]
+        self.metric = self.metrics[metric]
+        self.model = SentenceTransformer(model_name)
+    
+    def _get_body(self,document):
+        body = getattr(document, self.body_attr)
+        sentences = split_into_sentences(body)
+        if len(sentences) <= 1: return [body]
+        return sentences
+
+    def _summary(self, sentences : List[str], scores : List[float]) -> str:
+        idx = list(np.argsort(scores)[::self.reverse])
+        if self.num_sentences != 0: return ' '.join([sentences[x] for x in idx][:self.num_sentences])
+        return ' '.join([sentences[x] for x in idx])
+
+    def _list_summary(self, sentences : List[str], scores : List[float]) -> str:
+        idx = list(np.argsort(scores)[::self.reverse])
+        if self.num_sentences != 0: return [sentences[x] for x in idx][:self.num_sentences]
+        return [sentences[x] for x in idx][::self.reverse]
+
+    def _scorer(self, sentences : List[str], scores : List[float]) -> List[float]:
+        return scores
+    
+    def _summarize(self, text):
+        sentences = self._get_body(text)
+        if len(sentences) == 1: return self.output(sentences, [0])
+
+        query_embedding = self.model.encode([getattr(text, self.query_attr)])
+        sentence_embeddings = self.model.encode(sentences)
+
+        scores = self.metric(query_embedding, sentence_embeddings)
 
         return self.output(sentences, scores)
     
