@@ -107,7 +107,7 @@ class SentenceRanker(NeuralSummarizer):
         }
         self.output = outputs[setting]
         self.metric = metric
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name, device=self.device)
     
     def _get_body(self,document):
         body = getattr(document, self.body_attr)
@@ -132,8 +132,8 @@ class SentenceRanker(NeuralSummarizer):
         sentences = self._get_body(text)
         if len(sentences) == 1: return self.output(sentences, [0])
 
-        query_embedding = self.model.encode([getattr(text, self.query_attr)])
-        sentence_embeddings = self.model.encode(sentences)
+        query_embedding = self.model.encode([getattr(text, self.query_attr)], convert_to_numpy=True)
+        sentence_embeddings = self.model.encode(sentences, convert_to_numpy=True, show_progress_bar=self.verbose)
 
         scores = pairwise_distances(query_embedding, sentence_embeddings, metric=self.metric)
 
