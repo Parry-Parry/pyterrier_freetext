@@ -1,7 +1,6 @@
 from typing import List
 import numpy as np
 import pandas as pd
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
 from more_itertools import chunked
 import logging 
