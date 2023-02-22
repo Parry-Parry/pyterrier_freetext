@@ -1,11 +1,6 @@
 from typing import List
 import numpy as np
 import pandas as pd
-import torch
-from more_itertools import chunked
-import logging 
-from pyterrier_t5 import MonoT5Ranker
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics import pairwise_distances
 
 from . import split_into_sentences
@@ -25,18 +20,19 @@ class T5Ranker(NeuralSummarizer):
                  out_attr='summary', 
                  verbose=False) -> None:
         super().__init__(None, None, batch_size, device, enc_max_length, body_attr, out_attr, verbose)
-        
+        from pyterrier_t5 import MonoT5ReRanker
         self.num_sentences = num_sentences
         self.query_attr = query_attr
         self.reverse = 1 if reverse else -1
         if setting != 'scores' and output_list: setting = 'sentences'
         outputs = {
-            'summary' : self.summary,
-            'sentences' : self.list_summary,
-            'scores' : self.scorer
+            'summary' : self._summary,
+            'sentences' : self._list_summary,
+            'scores' : self._scorer,
+            'ranks' : self._ranks
         }
         self.output = outputs[setting]
-        self.model = MonoT5Ranker(batch_size=batch_size, text_field=self.body_attr, verbose=self.verbose)
+        self.model = MonoT5ReRanker(batch_size=batch_size, text_field=self.body_attr, verbose=self.verbose)
     
     def _get_body(self,document):
         body = getattr(document, self.body_attr)
@@ -63,6 +59,9 @@ class T5Ranker(NeuralSummarizer):
 
     def _scorer(self, sentences : List[str], scores : List[float]) -> List[float]:
         return scores
+    
+    def _ranks(self, sentences : List[str], scores : List[float]) -> List[float]:
+        return list(np.argsort(scores)[::self.reverse])
     
     def _summarize(self, text):
         sentences = self._get_body(text)
@@ -95,15 +94,16 @@ class SentenceRanker(NeuralSummarizer):
                  out_attr='summary', 
                  verbose=False) -> None:
         super().__init__(model_name, tokenizer_name, batch_size, device, enc_max_length, body_attr, out_attr, verbose)
-        
+        from sentence_transformers import SentenceTransformer
         self.num_sentences = num_sentences
         self.query_attr = query_attr
         self.reverse = 1 if reverse else -1
         if setting != 'scores' and output_list: setting = 'sentences'
         outputs = {
-            'summary' : self.summary,
-            'sentences' : self.list_summary,
-            'scores' : self.scorer
+            'summary' : self._summary,
+            'sentences' : self._list_summary,
+            'scores' : self._scorer,
+            'ranks' : self._ranks
         }
         self.output = outputs[setting]
         self.metric = metric
@@ -127,6 +127,9 @@ class SentenceRanker(NeuralSummarizer):
 
     def _scorer(self, sentences : List[str], scores : List[float]) -> List[float]:
         return scores
+    
+    def _ranks(self, sentences : List[str], scores : List[float]) -> List[float]:
+        return list(np.argsort(scores)[::self.reverse])
     
     def _summarize(self, text):
         sentences = self._get_body(text)
