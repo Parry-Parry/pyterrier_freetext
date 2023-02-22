@@ -6,7 +6,7 @@ from more_itertools import chunked
 import logging 
 from pyterrier_t5 import MonoT5Ranker
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import pairwise_distances
 
 from . import split_into_sentences
 from .. import NeuralSummarizer
@@ -79,9 +79,6 @@ class T5Ranker(NeuralSummarizer):
         return inp 
     
 class SentenceRanker(NeuralSummarizer):
-    metrics = {
-        'cosine' : cosine_similarity
-    }
     def __init__(self, 
                  model_name,
                  tokenizer_name=None,
@@ -109,7 +106,7 @@ class SentenceRanker(NeuralSummarizer):
             'scores' : self.scorer
         }
         self.output = outputs[setting]
-        self.metric = self.metrics[metric]
+        self.metric = metric
         self.model = SentenceTransformer(model_name)
     
     def _get_body(self,document):
@@ -138,7 +135,7 @@ class SentenceRanker(NeuralSummarizer):
         query_embedding = self.model.encode([getattr(text, self.query_attr)])
         sentence_embeddings = self.model.encode(sentences)
 
-        scores = self.metric(query_embedding, sentence_embeddings)
+        scores = pairwise_distances(query_embedding, sentence_embeddings, metric=self.metric)
 
         return self.output(sentences, scores)
     
