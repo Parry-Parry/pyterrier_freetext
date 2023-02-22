@@ -60,7 +60,6 @@ class LexRanker(Summarizer):
 
         self.reverse = 1 if reverse else -1
         self.norm = norm
-        self.verbose = verbose
 
         self.tokeniser = pt.rewrite.tokenise(tokeniser=tokeniser)
 
