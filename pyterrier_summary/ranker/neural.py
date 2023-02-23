@@ -48,12 +48,12 @@ class T5Ranker(NeuralSummarizer):
         return frame
 
     def _summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = list(np.argsort(scores)[::self.reverse])
+        idx = np.argsort(scores).tolist()[::self.reverse]
         if self.num_sentences != 0: return ' '.join([sentences[x] for x in idx][:self.num_sentences])
         return ' '.join([sentences[x] for x in idx])
 
     def _list_summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = list(np.argsort(scores)[::self.reverse])
+        idx = np.argsort(scores).tolist()[::self.reverse]
         if self.num_sentences != 0: return [sentences[x] for x in idx][:self.num_sentences]
         return [sentences[x] for x in idx][::self.reverse]
 
@@ -61,7 +61,7 @@ class T5Ranker(NeuralSummarizer):
         return scores
     
     def _ranks(self, sentences : List[str], scores : List[float]) -> List[float]:
-        return list(np.argsort(scores)[::self.reverse])
+        return np.argsort(scores).tolist()[::self.reverse]
     
     def _summarize(self, text):
         sentences = self._get_body(text)
@@ -116,12 +116,12 @@ class SentenceRanker(NeuralSummarizer):
         return sentences
 
     def _summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = list(np.argsort(scores)[::self.reverse])
+        idx = np.argsort(scores).tolist()[::self.reverse]
         if self.num_sentences != 0: return ' '.join([sentences[x] for x in idx][:self.num_sentences])
         return ' '.join([sentences[x] for x in idx])
 
     def _list_summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = list(np.argsort(scores)[::self.reverse])
+        idx = np.argsort(scores).tolist()[::self.reverse]
         if self.num_sentences != 0: return [sentences[x] for x in idx][:self.num_sentences]
         return [sentences[x] for x in idx][::self.reverse]
 
@@ -129,7 +129,7 @@ class SentenceRanker(NeuralSummarizer):
         return scores
     
     def _ranks(self, sentences : List[str], scores : List[float]) -> List[float]:
-        return list(np.argsort(scores)[::self.reverse])
+        return np.argsort(scores).tolist()[::self.reverse]
     
     def _summarize(self, text):
         sentences = self._get_body(text)
