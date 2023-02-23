@@ -1,7 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
 from more_itertools import chunked
-import logging 
 
 from .. import NeuralSummarizer
 

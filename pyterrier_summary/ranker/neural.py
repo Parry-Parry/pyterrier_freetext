@@ -137,12 +137,12 @@ class SentenceRanker(NeuralSummarizer):
 
         query_embedding = self.model.encode([getattr(text, self.query_attr)], convert_to_numpy=True)[0]
         sentence_embeddings = self.model.encode(sentences, convert_to_numpy=True, show_progress_bar=self.verbose)
-
-        scores = pairwise_distances(np.expand_dims(query_embedding, axis=0), np.concatenate(sentence_embeddings, axis=0), metric=self.metric)
+        scores = pairwise_distances(query_embedding.reshape(1, -1), np.stack(sentence_embeddings, axis=0), metric=self.metric)
 
         return self.output(sentences, scores.tolist())
     
     def transform(self, inp):
+        inp = inp.copy()
         assert self.query_attr in inp.columns and self.body_attr in inp.columns
         inp[self.out_attr] = inp.apply(lambda x : self._summarize(x), axis=1)
         return inp 
