@@ -8,31 +8,13 @@ from .. import NeuralSummarizer
 
 class T5Ranker(NeuralSummarizer):
     def __init__(self, 
-                 setting='summary',    
-                 num_sentences=0,
-                 reverse=False,
-                 output_list=False,
-                 batch_size=4, 
-                 device=None, 
-                 enc_max_length=180, 
-                 body_attr='text', 
                  query_attr='query',
-                 out_attr='summary', 
-                 verbose=False) -> None:
-        super().__init__(None, None, batch_size, device, enc_max_length, body_attr, out_attr, verbose)
+                 **kwargs) -> None:
+        super().__init__(**kwargs)
         from pyterrier_t5 import MonoT5ReRanker
-        self.num_sentences = num_sentences
+
         self.query_attr = query_attr
-        self.reverse = 1 if reverse else -1
-        if setting != 'scores' and output_list: setting = 'sentences'
-        outputs = {
-            'summary' : self._summary,
-            'sentences' : self._list_summary,
-            'scores' : self._scorer,
-            'ranks' : self._ranks
-        }
-        self.output = outputs[setting]
-        self.model = MonoT5ReRanker(batch_size=batch_size, text_field=self.body_attr, verbose=self.verbose)
+        self.model = MonoT5ReRanker(batch_size=self.batch_size, text_field=self.body_attr, verbose=self.verbose)
     
     def _get_body(self,document):
         body = getattr(document, self.body_attr)
@@ -46,22 +28,6 @@ class T5Ranker(NeuralSummarizer):
         frame['qid'] = 0
         frame[self.query_attr] = query
         return frame
-
-    def _summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = np.argsort(scores).tolist()[::self.reverse]
-        if self.num_sentences != 0: return ' '.join([sentences[x] for x in idx][:self.num_sentences])
-        return ' '.join([sentences[x] for x in idx])
-
-    def _list_summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = np.argsort(scores).tolist()[::self.reverse]
-        if self.num_sentences != 0: return [sentences[x] for x in idx][:self.num_sentences]
-        return [sentences[x] for x in idx][::self.reverse]
-
-    def _scorer(self, sentences : List[str], scores : List[float]) -> List[float]:
-        return scores
-    
-    def _ranks(self, sentences : List[str], scores : List[float]) -> List[float]:
-        return np.argsort(scores).tolist()[::self.reverse]
     
     def _summarize(self, text):
         sentences = self._get_body(text)
@@ -80,32 +46,15 @@ class T5Ranker(NeuralSummarizer):
 class SentenceRanker(NeuralSummarizer):
     def __init__(self, 
                  model_name,
-                 tokenizer_name=None,
-                 setting='summary',
+                 query_attr = 'query',
                  metric='cosine',    
-                 num_sentences=0,
-                 reverse=False,
-                 output_list=False,
                  batch_size=None, 
-                 device=None, 
-                 enc_max_length=180, 
-                 body_attr='text', 
-                 query_attr='query',
-                 out_attr='summary', 
-                 verbose=False) -> None:
-        super().__init__(model_name, tokenizer_name, batch_size, device, enc_max_length, body_attr, out_attr, verbose)
+                 enc_max_length=180,
+                 device=None,
+                 **kwargs) -> None:
+        super().__init__(model_name, None, batch_size, enc_max_length, device, **kwargs)
         from sentence_transformers import SentenceTransformer
-        self.num_sentences = num_sentences
         self.query_attr = query_attr
-        self.reverse = 1 if reverse else -1
-        if setting != 'scores' and output_list: setting = 'sentences'
-        outputs = {
-            'summary' : self._summary,
-            'sentences' : self._list_summary,
-            'scores' : self._scorer,
-            'ranks' : self._ranks
-        }
-        self.output = outputs[setting]
         self.metric = metric
         self.model = SentenceTransformer(model_name, device=self.device)
     
@@ -114,22 +63,6 @@ class SentenceRanker(NeuralSummarizer):
         sentences = split_into_sentences(body)
         if len(sentences) <= 1: return [body]
         return sentences
-
-    def _summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = np.argsort(scores).tolist()[::self.reverse]
-        if self.num_sentences != 0: return ' '.join([sentences[x] for x in idx][:self.num_sentences])
-        return ' '.join([sentences[x] for x in idx])
-
-    def _list_summary(self, sentences : List[str], scores : List[float]) -> str:
-        idx = np.argsort(scores).tolist()[::self.reverse]
-        if self.num_sentences != 0: return [sentences[x] for x in idx][:self.num_sentences]
-        return [sentences[x] for x in idx][::self.reverse]
-
-    def _scorer(self, sentences : List[str], scores : List[float]) -> List[float]:
-        return scores
-    
-    def _ranks(self, sentences : List[str], scores : List[float]) -> List[float]:
-        return np.argsort(scores).tolist()[::self.reverse]
     
     def _summarize(self, text):
         sentences = self._get_body(text)

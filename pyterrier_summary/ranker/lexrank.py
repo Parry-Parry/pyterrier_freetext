@@ -7,25 +7,18 @@ import numpy as np
 import pandas as pd
 from scipy.sparse.csgraph import connected_components
 from . import split_into_sentences
-from .. import Summarizer
+from .. import LexicalSummarizer
 
-class LexRanker(Summarizer):
+class LexRanker(LexicalSummarizer):
     def __init__(self, 
-                 setting='summary', 
-                 documents = None,
-                 background_index=None, 
+                 documents=None,
                  threshold=0., 
-                 num_sentences=0, 
-                 reverse=False, 
                  norm=True,
-                 output_list=False,
                  tokeniser='english', 
                  stopwords=True,
                  stemmer='PorterStemmer', 
-                 body_attr='text', 
-                 out_attr = 'summary',
-                 verbose=False) -> None:
-        super().__init__(body_attr, out_attr, verbose)
+                 **kwargs) -> None:
+        super().__init__(**kwargs)
         """LexRank Transformer
         ----------------------
         Settings:
@@ -50,15 +43,10 @@ class LexRanker(Summarizer):
         Markov Stationary Distribution Computation based on https://github.com/crabcamp/lexrank/
         """
 
-        self.indexref = background_index
-        self.index = None
         self.lexicon = None
         self.N = None
 
         self.threshold = threshold
-        self.num_sentences = num_sentences
-
-        self.reverse = 1 if reverse else -1
         self.norm = norm
 
         self.tokeniser = pt.rewrite.tokenise(tokeniser=tokeniser)
@@ -73,14 +61,6 @@ class LexRanker(Summarizer):
             self.stemmer = lambda x : x
 
         if documents: self.init_index(documents)
-
-        if setting != 'scores' and output_list: setting = 'sentences'
-        outputs = {
-            'summary' : self.summary,
-            'sentences' : self.list_summary,
-            'scores' : self.scorer
-        }
-        self.output = outputs[setting]
 
     def _text_pipeline(self, text):
         """Tokenise sentences, stem and remove stopwords"""
@@ -189,19 +169,6 @@ class LexRanker(Summarizer):
 
         return distribution
 
-    def _summary(self, sentences : List[str], scores : np.ndarray) -> str:
-        idx = list(np.argsort(scores)[::self.reverse])
-        if self.num_sentences != 0: return ' '.join([sentences[x] for x in idx][:self.num_sentences])
-        return ' '.join([sentences[x] for x in idx])
-
-    def _list_summary(self, sentences : List[str], scores : np.ndarray) -> str:
-        idx = list(np.argsort(scores)[::self.reverse])
-        if self.num_sentences != 0: return [sentences[x] for x in idx][:self.num_sentences]
-        return [sentences[x] for x in idx][::self.reverse]
-
-    def _scorer(self, sentences : List[str], scores : np.ndarray) -> List[float]:
-        return scores.tolist()
-
     def lexrank(self, doc) -> Union[str, List[float], List[str]]:
         assert self.index is not None, 'Initialize Index'
         logging.debug(f'Computing LexRank for Doc:{doc.docno}')
@@ -225,30 +192,15 @@ class LexRanker(Summarizer):
 
         return self.output(sentences, scores)
 
-    def init_index(self, documents : pd.DataFrame) -> None:
-        from pyterrier import DFIndexer, IndexFactory, autoclass
-        from pyterrier.index import IndexingType
-
-        indexref = DFIndexer(None, type=IndexingType.MEMORY, verbose=self.verbose).index(documents[self.body_attr], documents["docno"])
-        docno2docid = {docno:id for id, docno in enumerate(documents["docno"])} # Keeping this mystery line just in case
-        index_docs = IndexFactory.of(indexref)
-        docno2docid = {index_docs.getMetaIndex().getItem("docno", i) : i for i in range(index_docs.getCollectionStatistics().getNumberOfDocuments())}
-        assert len(docno2docid) == index_docs.getCollectionStatistics().getNumberOfDocuments(), "docno2docid size (%d) doesnt match index (%d)" % (len(docno2docid), index_docs.getCollectionStatistics().getNumberOfDocuments())
-        if self.indexref is None:
-            self.index = index_docs
-        else:
-            index_background = IndexFactory.of(self.indexref)
-            self.index = autoclass("org.terrier.python.IndexWithBackground")(index_docs, index_background)    
-        
-        self.lexicon = self.index.getLexicon()
-        self.N = self.index.getCollectionStatistics().getNumberOfDocuments()
-
     def transform(self, inp: pd.DataFrame) -> pd.DataFrame:
         assert "docno" in inp.columns and self.body_attr in inp.columns, "Malformed Frame, Expecting Documents"
         documents = inp[["docno", self.body_attr]].drop_duplicates(subset="docno")
         if self.index is None:
              logging.warning('Index not initialized, creating from inputs and a reference if it exists')   
              self.init_index(inp)
+            
+        self.lexicon = self.index.getLexicon()
+        self.N = self.index.getCollectionStatistics().getNumberOfDocuments()
 
         documents[self.out_attr] = documents.apply(lambda x : self._lexrank(x), axis=1)
         return documents

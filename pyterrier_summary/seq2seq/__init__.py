@@ -7,15 +7,9 @@ from .. import NeuralSummarizer
 class Seq2SeqSummarizer(NeuralSummarizer):
     def __init__(self, 
                  model_name, 
-                 tokenizer_name=None, 
-                 inplace=True, 
-                 batch_size=4, 
-                 device=None, 
-                 enc_max_length=180, 
-                 body_attr='text', 
-                 out_attr='summary', 
-                 verbose=False) -> None:
-        super().__init__(model_name, tokenizer_name, batch_size, device, enc_max_length, body_attr, out_attr, verbose)
+                 inplace=True,
+                 **kwargs) -> None:
+        super().__init__(model_name, **kwargs)
         
         self.inplace = inplace
 
