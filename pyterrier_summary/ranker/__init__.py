@@ -1,5 +1,7 @@
+import pyterrier as pt
 import re
 from typing import List 
+from pyterrier_summary import sentencesnippets
 
 alphabets= "([A-Za-z])"
 prefixes = "(Mr|St|Mrs|Ms|Dr)[.]"
@@ -37,3 +39,11 @@ def split_into_sentences(text : str) -> List[str]:
     sentences = sentences[:-1]
     sentences = [s.strip() for s in sentences]
     return sentences
+
+def splitter(df, body_attr='text'):
+    df['sentences'] = df[body_attr].apply(lambda x : split_into_sentences(x), axis=1)
+    return df
+
+def compose_pipe(data_pipe, summarizer):
+    summary = sentencesnippets(summarizer, text_attr=summarizer.body_attr, summary_attr='summary') 
+    return data_pipe >> summary 

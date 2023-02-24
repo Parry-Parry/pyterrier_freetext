@@ -194,7 +194,7 @@ class LexRanker(LexicalSummarizer):
 
     def transform(self, inp: pd.DataFrame) -> pd.DataFrame:
         assert "docno" in inp.columns and self.body_attr in inp.columns, "Malformed Frame, Expecting Documents"
-        documents = inp[["docno", self.body_attr]].drop_duplicates(subset="docno")
+        inp = inp.copy()
         if self.index is None:
              logging.warning('Index not initialized, creating from inputs and a reference if it exists')   
              self.init_index(inp)
@@ -202,8 +202,5 @@ class LexRanker(LexicalSummarizer):
         self.lexicon = self.index.getLexicon()
         self.N = self.index.getCollectionStatistics().getNumberOfDocuments()
 
-        documents[self.out_attr] = documents.apply(lambda x : self._lexrank(x), axis=1)
-        return documents
-
-        
-
+        inp[self.out_attr] = inp.apply(lambda x : self._lexrank(x), axis=1)
+        return inp

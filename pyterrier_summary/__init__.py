@@ -92,3 +92,57 @@ class NeuralSummarizer(Summarizer):
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.device = torch.device(device)        
 
+def sentencesnippets(
+        text_scorer_pipe : pt.Transformer, 
+        text_attr : str = "text", 
+        summary_attr : str = "summary") -> pt.Transformer:
+    """
+    Applies query-biased summarisation (snippet), by applying the specified text scoring pipeline.
+
+    Parameters:
+        text_scorer_pipe(Transformer): the pipeline for scoring passages in response to the query. Normally this applies passaging.
+        text_attr(str): what is the name of the attribute that contains the text of the document
+        summary_attr(str): what is the name of the attribute that should contain the query-biased summary for that document
+
+    Example::
+
+        # retrieve documents with text
+        br = pt.BatchRetrieve(index, metadata=['docno', 'text'])
+
+        # use Tf as a passage scorer on sliding window passages 
+        psg_scorer = ( 
+            pt.text.sliding(text_attr='text', length=15, prepend_attr=None) 
+            >> pt.text.scorer(body_attr="text", wmodel='Tf', takes='docs')
+        )
+        
+        # use psg_scorer for performing query-biased summarisation on docs retrieved by br 
+        retr_pipe = br >> pt.text.snippets(psg_scorer)
+
+    """
+    tsp = (
+        pt.apply.rename({'qid' : 'oldqid'}) 
+        >> pt.apply.qid(lambda row: row['oldqid'] + '-' + row['docno']) 
+        >> text_scorer_pipe
+        >> pt.apply.qid(drop=True)
+        >> pt.apply.rename({'oldqid' : 'qid'})
+    )
+
+    def _qbsjoin(docres):
+        import pandas as pd
+        if len(docres) == 0:
+            docres[summary_attr] = pd.Series(dtype='str')
+            return docres     
+
+        psgres = tsp(docres)
+        if len(psgres) == 0:
+            print('no passages found in %d documents for query %s' % (len(docres), docres.iloc[0].query))
+            docres = docres.copy()
+            docres[summary_attr]  = ""
+            return docres
+
+        psgres[["olddocno", "pid"]] = psgres.docno.str.split("%p", expand=True)
+
+        newdf = psgres.groupby(['qid', 'olddocno'])[text_attr].reset_index().rename(columns={text_attr : summary_attr, 'olddocno' : 'docno'})
+        
+        return docres.merge(newdf, on=['qid', 'docno'], how='left')
+    return pt.apply.generic(_qbsjoin)   
