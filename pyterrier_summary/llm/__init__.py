@@ -37,8 +37,11 @@ class GenerativeTransformer(pt.Transformer):
         # Set up accelerate
         # Is the model sharded?
         # Other generation kwargs
+    
+    def fit(self, train) -> None:
+        pass
 
-    def generate(self, frame):
+    def generate(self, frame) -> str:
         sub = frame[self.prompt.get_params()].todict()
         text = self.prompt(**sub)
         input_ids = self.tokenizer(text).input_ids.to(0)
