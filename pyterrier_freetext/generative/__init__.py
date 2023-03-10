@@ -47,7 +47,7 @@ class GenerativeTransformer(pt.Transformer):
 
     def generate(self, frame) -> str:
         sub = frame[self.prompt.get_params()].todict()
-        text = self.prompt(**sub)
+        text = self.prompt.create_prompt(**sub)
         with torch.no_grad():
             input_ids = self.tokenizer(text, return_tensors="pt").input_ids
             for i, input_id in enumerate(input_ids):
@@ -63,7 +63,7 @@ class GenerativeTransformer(pt.Transformer):
 
     def transform(self, input):
         output = input.copy()
-        output[self.out_attr] = output.apply(lambda x : self.generate(x))
+        output[self.out_attr] = output.apply(lambda x : self.generate(x), axis=1)
 
 class prompt_constructor:
     def __init__(self, prompt, params) -> None:
