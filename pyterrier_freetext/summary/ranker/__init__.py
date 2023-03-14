@@ -1,9 +1,8 @@
-from typing import List
 import numpy as np
 import pandas as pd
 from sklearn.metrics import pairwise_distances
 
-from ..util import split_into_sentences
+from ...util import split_into_sentences
 from .. import NeuralSummarizer
 
 class MonoT5SentenceRanker(NeuralSummarizer):

@@ -6,7 +6,7 @@ from typing import List, NamedTuple, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy.sparse.csgraph import connected_components
-from ..util import split_into_sentences
+from ...util import split_into_sentences
 from .. import LexicalSummarizer
 
 class LexRanker(LexicalSummarizer):
