@@ -8,8 +8,8 @@ from more_itertools import chunked
 
 class Summarizer(pt.Transformer):
     def __init__(self, 
-                 body_attr, 
-                 out_attr, 
+                 body_attr='text', 
+                 out_attr='summary', 
                  mode='summary', 
                  output_list=False, 
                  num_sentences=0, 
