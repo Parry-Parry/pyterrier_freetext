@@ -1,3 +1,5 @@
+import pyterrier as pt
+pt.init()
 from pyterrier_freetext.summary.ranker import SentenceRanker
 import ir_datasets
 import pandas as pd
