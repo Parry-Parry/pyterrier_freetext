@@ -3,8 +3,6 @@ import re
 from typing import List 
 
 import torch
-from transformers import AutoModelForCausalLM, AutoConfig
-from accelerate import init_empty_weights, infer_auto_device_map
 
 
 alphabets= "([A-Za-z])"
@@ -116,6 +114,8 @@ def compose_pipe(data_pipe, summarizer):
     return data_pipe >> summary 
 
 def get_map(model_id : str, mem : dict = None, do_int8 : bool = True):
+    from transformers import AutoModelForCausalLM, AutoConfig
+    from accelerate import init_empty_weights, infer_auto_device_map
     if not mem: return 'auto'
     with init_empty_weights():
         config = AutoConfig.from_pretrained(model_id)
