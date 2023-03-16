@@ -3,12 +3,27 @@ import re
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
+class PromptConstructor:
+    def __init__(self, prompt, params) -> None:
+        for param in params: assert f"[{param}]" in prompt, "Parameter not found in prompt"
+        self.prompt = prompt
+        self.params = params 
+    
+    def get_params(self):
+        return self.params
+        
+    def create_prompt(self, **kwargs):
+        tmp_prompt = self.prompt
+        if self.params:
+            for param in self.params: tmp_prompt = re.sub(f'[{param}]', tmp_prompt, kwargs.pop(param, "")) 
+        return tmp_prompt
+
 class GenerativeTransformer(pt.Transformer):
     def __init__(self, 
-                 prompt, 
-                 model_id, 
-                 out_attr='text', 
-                 post_process=lambda x : x,
+                 prompt : PromptConstructor, 
+                 model_id : str, 
+                 out_attr : str ='text', 
+                 post_process : callable = lambda x : x,
                  **kwargs) -> None:
         super().__init__()
         self.prompt = prompt 
@@ -61,21 +76,6 @@ class GenerativeTransformer(pt.Transformer):
     def transform(self, input):
         output = input.copy()
         output[self.out_attr] = output.apply(lambda x : self.generate(x), axis=1)
-
-class prompt_constructor:
-    def __init__(self, prompt, params) -> None:
-        for param in params: assert f"[{param}]" in prompt, "Parameter not found in prompt"
-        self.prompt = prompt
-        self.params = params 
-    
-    def get_params(self):
-        return self.params
-        
-    def create_prompt(self, **kwargs):
-        tmp_prompt = self.prompt
-        if self.params:
-            for param in self.params: tmp_prompt = re.sub(f'[{param}]', tmp_prompt, kwargs.pop(param, "")) 
-        return tmp_prompt
 
 def generic_transform(prompt, model_id, **kwargs):
     transform = GenerativeTransformer(prompt, model_id, **kwargs)
