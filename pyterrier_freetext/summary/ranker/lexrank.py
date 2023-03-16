@@ -202,5 +202,5 @@ class LexRanker(LexicalSummarizer):
         self.lexicon = self.index.getLexicon()
         self.N = self.index.getCollectionStatistics().getNumberOfDocuments()
 
-        inp[self.out_attr] = inp.apply(lambda x : self._lexrank(x), axis=1)
+        inp[self.out_attr] = inp.apply(lambda x : self.lexrank(x), axis=1)
         return inp
