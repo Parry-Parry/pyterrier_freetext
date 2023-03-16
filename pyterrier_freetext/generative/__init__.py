@@ -50,9 +50,6 @@ class GenerativeTransformer(pt.Transformer):
         text = self.prompt.create_prompt(**sub)
         with torch.no_grad():
             input_ids = self.tokenizer(text, return_tensors="pt").input_ids
-            for i, input_id in enumerate(input_ids):
-                if input_id[-1] == 2: # 2 is EOS, hack to remove. If the prompt is ending with EOS, often the generation will stop abruptly.
-                    input_ids[i] = input_id[:-1]
             input_ids = input_ids.to(0)
         
             generated_ids = self.model.generate(
