@@ -1,6 +1,3 @@
-from ranker import MonoT5SentenceRanker, SentenceRanker
-from ranker.lexrank import LexRanker
-
 import pyterrier as pt
 from typing import List
 import numpy as np
@@ -129,3 +126,6 @@ class AbstractiveSummarizer(NeuralSummarizer):
         out = self._set_mode(inp)
         out[self.out_attr] = self._summarize(out[self.body_attr])
         return out 
+    
+from ranker import MonoT5SentenceRanker, SentenceRanker
+from ranker.lexrank import LexRanker
