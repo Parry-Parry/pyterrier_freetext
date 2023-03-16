@@ -77,7 +77,7 @@ class LexicalSummarizer(Summarizer):
 
 class NeuralSummarizer(Summarizer):
     def __init__(self, 
-                 model_name, 
+                 model_name=None, 
                  tokenizer_name=None, 
                  batch_size=32, 
                  enc_max_length=180, 
