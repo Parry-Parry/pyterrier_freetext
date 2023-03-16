@@ -73,9 +73,9 @@ class prompt_constructor:
         
     def create_prompt(self, **kwargs):
         tmp_prompt = self.prompt
-        if self.names:
+        if self.params:
             params = {param : kwargs.pop(param, "") for param in self.params}
-            for param in self.names: tmp_prompt = re.sub(f'[{param}]', tmp_prompt, params[param]) 
+            for param in self.params: tmp_prompt = re.sub(f'[{param}]', tmp_prompt, params[param]) 
         return tmp_prompt
 
 def generic_transform(prompt, model_id, **kwargs):
