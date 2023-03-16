@@ -54,7 +54,7 @@ class Summarizer(pt.Transformer):
         raise NotImplementedError
 
 class LexicalSummarizer(Summarizer):
-    def __init__(self, indexref, **kwargs) -> None:
+    def __init__(self, indexref=None, **kwargs) -> None:
         super().__init__(**kwargs)
         
         self.indexref = indexref
