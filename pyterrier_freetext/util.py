@@ -1,17 +1,8 @@
 import pyterrier as pt
 import re
 from typing import List 
-
 import torch
 
-
-alphabets= "([A-Za-z])"
-prefixes = "(Mr|St|Mrs|Ms|Dr)[.]"
-suffixes = "(Inc|Ltd|Jr|Sr|Co)"
-starters = "(Mr|Mrs|Ms|Dr|Prof|Capt|Cpt|Lt|He\s|She\s|It\s|They\s|Their\s|Our\s|We\s|But\s|However\s|That\s|This\s|Wherever)"
-acronyms = "([A-Z][.][A-Z][.](?:[A-Z][.])?)"
-websites = "[.](com|net|org|io|gov|edu|me)"
-digits = "([0-9])"
 
 def sentence_snippets(
         text_scorer_pipe : pt.Transformer, 
@@ -77,33 +68,8 @@ def sentence_snippets(
     return pt.apply.generic(_qbsjoin)   
 
 def split_into_sentences(text : str) -> List[str]:
-    """Sentence Regex from: https://stackoverflow.com/a/31505798"""
-    text = " " + text + "  "
-    text = text.replace("\n"," ")
-    text = re.sub(prefixes,"\\1<prd>",text)
-    text = re.sub(websites,"<prd>\\1",text)
-    text = re.sub(digits + "[.]" + digits,"\\1<prd>\\2",text)
-    if "..." in text: text = text.replace("...","<prd><prd><prd>")
-    if "Ph.D" in text: text = text.replace("Ph.D.","Ph<prd>D<prd>")
-    text = re.sub("\s" + alphabets + "[.] "," \\1<prd> ",text)
-    text = re.sub(acronyms+" "+starters,"\\1<stop> \\2",text)
-    text = re.sub(alphabets + "[.]" + alphabets + "[.]" + alphabets + "[.]","\\1<prd>\\2<prd>\\3<prd>",text)
-    text = re.sub(alphabets + "[.]" + alphabets + "[.]","\\1<prd>\\2<prd>",text)
-    text = re.sub(" "+suffixes+"[.] "+starters," \\1<stop> \\2",text)
-    text = re.sub(" "+suffixes+"[.]"," \\1<prd>",text)
-    text = re.sub(" " + alphabets + "[.]"," \\1<prd>",text)
-    if "”" in text: text = text.replace(".”","”.")
-    if "\"" in text: text = text.replace(".\"","\".")
-    if "!" in text: text = text.replace("!\"","\"!")
-    if "?" in text: text = text.replace("?\"","\"?")
-    text = text.replace(".",".<stop>")
-    text = text.replace("?","?<stop>")
-    text = text.replace("!","!<stop>")
-    text = text.replace("<prd>",".")
-    sentences = text.split("<stop>")
-    sentences = sentences[:-1]
-    sentences = [s.strip() for s in sentences]
-    return sentences
+    from nltk.tokenize import sent_tokenize
+    return sent_tokenize(text)
 
 def splitter(df, body_attr='text'):
     df['sentences'] = df[body_attr].apply(lambda x : split_into_sentences(x), axis=1)
@@ -113,16 +79,24 @@ def compose_pipe(data_pipe, summarizer):
     summary = sentence_snippets(summarizer, text_attr=summarizer.body_attr, summary_attr='summary') 
     return data_pipe >> summary 
 
-def get_map(model_id : str, mem : dict = None, do_int8 : bool = True):
+def get_map(model_id : str, 
+            mem : dict = None, 
+            do_int8 : bool = True, 
+            model_type=None, 
+            no_split : list = None):
     from transformers import AutoModelForCausalLM, AutoConfig
     from accelerate import init_empty_weights, infer_auto_device_map
+
     if not mem: return 'auto'
     with init_empty_weights():
         config = AutoConfig.from_pretrained(model_id)
-        model = AutoModelForCausalLM.from_config(config)
+        model = model_type(config) if model_type else AutoModelForCausalLM.from_config(config)
     
     device_map = infer_auto_device_map(
-        model, max_memory=mem, dtype=torch.int8 if do_int8 else torch.float16, no_split_module_classes=["BloomBlock", "OPTDecoderLayer", "LLaMADecoderLayer"]
+        model, 
+        max_memory=mem, 
+        dtype=torch.int8 if do_int8 else torch.float16, 
+        no_split_module_classes=no_split if no_split else ["BloomBlock", "OPTDecoderLayer", "LLaMADecoderLayer"]
     )
     print(device_map)
     del model 

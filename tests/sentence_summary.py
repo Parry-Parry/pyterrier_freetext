@@ -15,7 +15,10 @@ def build_data(path):
       result.append([qrel.query_id, queries[qrel.query_id], qrel.doc_id, docs.get(qrel.doc_id).text])
   return pd.DataFrame(result, columns=['qid', 'query', 'docno', 'text'])
 
-def main(dataset : str, summary_model : str, num_docs : int, mode='summary'):
+def main(dataset : str, 
+         summary_model : str, 
+         num_docs : int, 
+         mode='summary'):
     data = build_data(dataset).iloc[:num_docs]
 
     model = SentenceRanker(summary_model, mode=mode, num_sentences=1, out_attr='sentence')
