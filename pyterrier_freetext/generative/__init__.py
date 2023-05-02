@@ -19,6 +19,10 @@ class Prompt:
     def __repr__(self):
         return f'Prompt(prompt={self.prompt}, params={self.params})'
     
+    @staticmethod
+    def fromjson(json_str):
+        return json.loads(json_str, object_hook=lambda x: Prompt(**x))
+                          
     def tojson(self):
         return json.dumps(self, default=lambda x: x.__dict__, 
             sort_keys=True, indent=4)
