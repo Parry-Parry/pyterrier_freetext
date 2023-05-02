@@ -1,26 +1,38 @@
 import pyterrier as pt
 import re
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import torch
+import json
 
-class PromptConstructor:
-    def __init__(self, prompt, params) -> None:
-        for param in params: assert f"[{param}]" in prompt, "Parameter not found in prompt"
+class Prompt:
+    # Prompt constructor from LightChain
+    def __init__(self, prompt, params=None):
         self.prompt = prompt
-        self.params = params 
-    
-    def get_params(self):
-        return self.params
+        self.params = params
+
+        if params:
+            for param in params: assert f'{{{param}}}' in prompt, f'Param {param} not found in prompt {prompt}'
         
-    def create_prompt(self, **kwargs):
-        tmp_prompt = self.prompt
-        if self.params:
-            for param in self.params: tmp_prompt = re.sub(f'[{param}]', tmp_prompt, kwargs.pop(param, "")) 
-        return tmp_prompt
+    def __str__(self):
+        return self.prompt
+
+    def __repr__(self):
+        return f'Prompt(prompt={self.prompt}, params={self.params})'
+    
+    def tojson(self):
+        return json.dumps(self, default=lambda x: x.__dict__, 
+            sort_keys=True, indent=4)
+    
+    def construct(self, **kwargs):
+        for key in kwargs: assert key in self.params, f'Param {key} not found in params {self.params}'
+        return self.prompt.format(**kwargs)
+    
+    def batch_construct(self, params):
+        return [self.construct(**param) for param in params]
     
 class GenericGenerativeTransformer(pt.Transformer):
     def __init__(self, 
-                 prompt : PromptConstructor, 
+                 prompt : Prompt, 
                  out_attr : str ='text', 
                  post_process : callable = lambda x : x,
                  **kwargs) -> None:
@@ -29,6 +41,8 @@ class GenericGenerativeTransformer(pt.Transformer):
         self.out_attr = out_attr
         self.post_process = post_process
         self.generate = None
+        self.model = None 
+        self.tokenizer = None
 
         self.batch_size = kwargs.pop('batch_size', 1)
 
@@ -44,14 +58,28 @@ class GenericGenerativeTransformer(pt.Transformer):
             "length_penalty" : kwargs.pop('length_penalty', 1.0)
         }
 
+    def batch_generate(self, df):
+        sub = df[self.prompt.get_params()].todict('records')
+        text = self.prompt.batch_prompt(sub)
+
+        # Change to custom batching
+
+        pipe = pipeline(model=self.model, tokenizer=self.tokenizer, batch_size=self.batch_size)
+        return list(map(self.post_process, pipe(text)))
+
+    def fit(self, train_data) -> None:
+        raise NotImplementedError
+
     def transform(self, input):
         assert self.generate is not None, "Must instantiate a model!"
         output = input.copy()
-        output[self.out_attr] = output.apply(lambda x : self.generate(x), axis=1)
+        if self.batch_size > 1: output[self.out_attr] = self.batch_generate(output)
+        else: output[self.out_attr] = output.apply(lambda x : self.generate(x), axis=1)
+        return output
 
 class FlexibleLMTransformer(GenericGenerativeTransformer):
     def __init__(self, 
-                 prompt : PromptConstructor, 
+                 prompt : Prompt, 
                  model, 
                  tokenizer,
                  out_attr : str ='text', 
@@ -68,13 +96,11 @@ class FlexibleLMTransformer(GenericGenerativeTransformer):
 
         if generate_kwargs:
             self.generate_kwargs = generate_kwargs
-    
-    def fit(self, train_data) -> None:
-        raise NotImplementedError
 
     def generate(self, frame) -> str:
         sub = frame[self.prompt.get_params()].todict()
-        text = self.prompt.create_prompt(**sub)
+        if self.batch_size > 1: text = self.prompt.batch_prompt(sub)
+        else: text = self.prompt.create_prompt(**sub)
         with torch.no_grad():
             input_ids = self.tokenizer(text, return_tensors="pt").input_ids
             input_ids = input_ids.to(0)
@@ -83,11 +109,14 @@ class FlexibleLMTransformer(GenericGenerativeTransformer):
                 input_ids,
                 **self.generate_kwargs
             )
-            return self.post_process(self.tokenizer.batch_decode(generated_ids.cpu(), skip_special_tokens=True)[0])
+
+        out = list(map(self.post_process, self.tokenizer.batch_decode(generated_ids.cpu(), skip_special_tokens=True)))
+        if self.batch_size > 1: return out
+        return out[0]
 
 class CausalLMTransformer(GenericGenerativeTransformer):
     def __init__(self,
-                 prompt : PromptConstructor, 
+                 prompt : Prompt, 
                  model_id : str, 
                  out_attr : str ='text', 
                  post_process : callable = lambda x : x,
@@ -109,13 +138,11 @@ class CausalLMTransformer(GenericGenerativeTransformer):
             load_in_8bit=do_int8
         )
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast="/opt" not in model_id)
-    
-    def fit(self, train_data) -> None:
-        raise NotImplementedError
 
     def generate(self, frame) -> str:
         sub = frame[self.prompt.get_params()].todict()
-        text = self.prompt.create_prompt(**sub)
+        if self.batch_size > 1: text = self.prompt.batch_prompt(sub)
+        else: text = self.prompt.create_prompt(**sub)
         with torch.no_grad():
             input_ids = self.tokenizer(text, return_tensors="pt").input_ids
             input_ids = input_ids.to(0)
@@ -124,7 +151,7 @@ class CausalLMTransformer(GenericGenerativeTransformer):
                 input_ids,
                 **self.generate_kwargs
             )
-            return self.post_process(self.tokenizer.batch_decode(generated_ids.cpu(), skip_special_tokens=True)[0])
+        return list(map(self.post_process, self.tokenizer.batch_decode(generated_ids.cpu(), skip_special_tokens=True)))
 
 def causal_transform(prompt, model_id, **kwargs):
     transform = CausalLMTransformer(prompt, model_id, **kwargs)
